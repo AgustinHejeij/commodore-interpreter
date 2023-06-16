@@ -1,5 +1,5 @@
 (ns tp-formales.main
-
+  (:require [clojure.string :as str])
   (:gen-class))
 
 (declare driver-loop)                     ; NO TOCAR
@@ -29,23 +29,23 @@
 (declare palabra-reservada?)              ; IMPLEMENTAR (DONE)
 (declare operador?)                       ; IMPLEMENTAR (DONE)
 (declare anular-invalidos)                ; IMPLEMENTAR (DONE)
-(declare cargar-linea)                    ; IMPLEMENTAR
+(declare cargar-linea)                    ; IMPLEMENTAR (DONE)
 (declare expandir-nexts)                  ; IMPLEMENTAR (DONE)
-(declare dar-error)                       ; IMPLEMENTAR
+(declare dar-error)                       ; IMPLEMENTAR (DONE?)
 (declare variable-float?)                 ; IMPLEMENTAR (DONE)
 (declare variable-integer?)               ; IMPLEMENTAR (DONE)
 (declare variable-string?)                ; IMPLEMENTAR (DONE)
 (declare contar-sentencias)               ; IMPLEMENTAR (DONE)
-(declare buscar-lineas-restantes)         ; IMPLEMENTAR
-(declare continuar-linea)                 ; IMPLEMENTAR
-(declare extraer-data)                    ; IMPLEMENTAR
+(declare buscar-lineas-restantes)         ; IMPLEMENTAR (DONE)
+(declare continuar-linea)                 ; IMPLEMENTAR (DONE)
+(declare extraer-data)                    ; IMPLEMENTAR (DONE)
 (declare ejecutar-asignacion)             ; IMPLEMENTAR
 (declare preprocesar-expresion)           ; IMPLEMENTAR
 (declare desambiguar)                     ; IMPLEMENTAR
-(declare precedencia)                     ; IMPLEMENTAR
-(declare aridad)                          ; IMPLEMENTAR
-(declare eliminar-cero-decimal)           ; IMPLEMENTAR
-(declare eliminar-cero-entero)            ; IMPLEMENTAR
+(declare precedencia)                     ; IMPLEMENTAR (DONE)
+(declare aridad)                          ; IMPLEMENTAR (DONE)
+(declare eliminar-cero-decimal)           ; IMPLEMENTAR (DONE)
+(declare eliminar-cero-entero)            ; IMPLEMENTAR (DONE)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; driver-loop: el REPL del interprete de Commodore 64 BASIC V2
@@ -694,7 +694,19 @@
 ; user=> (cargar-linea '(15 (X = X - 1)) ['((10 (PRINT X)) (15 (X = X + 1)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}])
 ; [((10 (PRINT X)) (15 (X = X - 1)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}]
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn cargar-linea-aux [linea prog-mem]
+  (
+    cond
+    (not (list? prog-mem)) prog-mem
+    (empty? prog-mem) (list linea)
+    (< (first linea) (first (first prog-mem))) (cons linea prog-mem)
+    (= (first linea) (first (first prog-mem))) (cons linea (rest prog-mem))
+    :else (cons (first prog-mem) (cargar-linea-aux linea (rest prog-mem)))
+  )
+)
+
 (defn cargar-linea [linea amb]
+  (vec (map (partial cargar-linea-aux linea) amb))
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -735,7 +747,24 @@
 ;
 ; ?ERROR DISK FULL IN 100nil
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn print-return-nil [msj]
+    (newline)(print msj)
+)
+
 (defn dar-error [cod prog-ptrs]
+  (
+   cond
+   (int? (first prog-ptrs)) (
+    cond
+      (int? cod) (print-return-nil (str (buscar-mensaje cod) " IN " (first prog-ptrs)))
+      :else (print-return-nil (str cod " IN " (first prog-ptrs)))
+   )
+   :else (
+      cond
+      (int? cod) (print-return-nil (str (buscar-mensaje cod)))
+      :else (print-return-nil (str cod))
+   )
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -833,7 +862,22 @@
 ; user=> (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [25 0] [] [] [] 0 {}])
 ; nil
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn buscar-lineas-restantes-aux [prog ptrs]
+  (
+    cond
+    (empty? prog) nil
+    (not= (first (first prog)) (first ptrs)) (buscar-lineas-restantes-aux (rest prog) ptrs)
+    (>= 0 (second ptrs)) (cons (list (first (first prog))) (rest prog))
+    :else (cons (cons (first ptrs) (take-last (second ptrs) (expandir-nexts (rest (first prog))))) (rest prog))
+  )
+)
+
 (defn buscar-lineas-restantes [amb]
+  (
+    cond
+    (not (int? (first (second amb)))) nil
+    :else (buscar-lineas-restantes-aux (first amb) (second amb))
+  )
 )
 
 
@@ -848,7 +892,12 @@
 ; user=> (continuar-linea [(list '(10 (PRINT X)) '(15 (GOSUB 100) (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 3] [[15 2]] [] [] 0 {}])
 ; [:omitir-restante [((10 (PRINT X)) (15 (GOSUB 100) (X = X + 1)) (20 (NEXT I , J))) [15 1] [] [] [] 0 {}]]
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn continuar-linea [amb]
+(defn continuar-linea [amb] ; devolver siempre omitir-restante (codigo del error: 22)
+  (
+    cond
+    (empty? (nth amb 2)) [(dar-error 22 (second amb)) amb]
+    :else [:omitir-restante [(first amb) [(first (first (nth amb 2))) (dec (second (first (nth amb 2))))] [] (nth amb 3) (nth amb 4) (nth amb 5) (nth amb 6)]]
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -860,7 +909,37 @@
 ; user=> (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'MUNDO (symbol ",") 10 (symbol ",") 20))))
 ; ("HOLA" "MUNDO" 10 20)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn transformar-a-int [string]
+  (
+    cond
+    (boolean (re-matches #"[0-9]*" (str/trim string))) (Integer. (str/trim string))
+    (boolean (re-matches #"[0-9]*\.[0-9]*" (str/trim string))) (Float. (str/trim string))
+    :else (str/trim string)
+  )
+)
+
+
+(defn extraer-data-sentencia [sentencia]
+  (
+    map transformar-a-int (str/split (str/join " " sentencia) #",")
+  )
+)
+
+(defn extraer-data-linea [linea]
+  (
+    cond
+    (int? (first linea)) (extraer-data-linea (rest linea))
+    (empty? linea) linea
+    (= (first (first linea)) 'REM) (list)
+    (= (first (first linea)) 'DATA) (concat (extraer-data-sentencia (rest (first linea))) (extraer-data-linea (rest linea)))
+    :else (extraer-data-linea (rest linea))
+  )
+)
+
 (defn extraer-data [prg]
+  (
+    apply concat (map extraer-data-linea prg)
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -922,6 +1001,16 @@
 ; 8
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn precedencia [token]
+  (
+    cond
+    (= 'OR token) 1
+    (= 'AND token) 2
+    (.contains '(< > = <= >= <>) token) 4
+    (.contains '(+ -) token) 5
+    (.contains '(* /) token) 6
+    (= '-u token) 7
+    :else 8
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -939,6 +1028,13 @@
 ; 3
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn aridad [token]
+  (
+    cond
+    (.contains '(ATN INT SIN EXP LOG LEN ASC CHR$ STR$ -u ) token) 1
+    (.contains '(MID$ OR AND + - * / < > = <= >= <>) token) 2
+    (= 'MID3$ token) 3
+    :else 0
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -956,8 +1052,9 @@
 (defn eliminar-cero-decimal [n]
     (
         cond
-        (not (float? n)) n
-        :else ()
+        (not (or (float? n) (double? n))) n
+        (== (int n) n) (int n)
+        :else n
     )
 )
 
@@ -985,6 +1082,16 @@
 ; "-.5"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn eliminar-cero-entero [n]
+    (
+        cond
+        (nil? n) nil
+        (not (number? n)) (str n)
+        (>= n 1) (str " " n)
+        (<= n -1) (str n)
+        (= n 0) (str " " n)
+        (>= n 0) (str " " (subs (str n) 1))
+        :else (str "-" (subs (str n) 2))
+    )
 )
 
 true

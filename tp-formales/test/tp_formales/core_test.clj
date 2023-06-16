@@ -174,4 +174,138 @@
     (is (= '(IF X nil * Y < 12 THEN LET nil X = 0) (anular-invalidos '(IF X & * Y < 12 THEN LET ! X = 0))))
   )
 )
-    
+
+(deftest aridad-test
+  (testing "Test funcion aridad"
+    (is (= 0 (aridad 'THEN)))
+    (is (= 0 (aridad 'IF)))
+    (is (= 1 (aridad 'SIN)))
+    (is (= 1 (aridad 'ATN)))
+    (is (= 1 (aridad 'INT)))
+    (is (= 1 (aridad 'EXP)))
+    (is (= 1 (aridad 'LOG)))
+    (is (= 1 (aridad 'LEN)))
+    (is (= 1 (aridad 'ASC)))
+    (is (= 1 (aridad 'CHR$)))
+    (is (= 1 (aridad 'STR$)))
+    (is (= 1 (aridad '-u)))
+    (is (= 2 (aridad '*)))
+    (is (= 2 (aridad 'OR)))
+    (is (= 2 (aridad 'AND)))
+    (is (= 2 (aridad '+)))
+    (is (= 2 (aridad '-)))
+    (is (= 2 (aridad '/)))
+    (is (= 2 (aridad '<)))
+    (is (= 2 (aridad '>)))
+    (is (= 2 (aridad '=)))
+    (is (= 2 (aridad '<=)))
+    (is (= 2 (aridad '>=)))
+    (is (= 2 (aridad '<>)))
+    (is (= 2 (aridad 'MID$)))
+    (is (= 3 (aridad 'MID3$)))
+  )
+)
+
+(deftest precedencia-test
+  (testing "Test funcion precedencia"
+    (is (= 1 (precedencia 'OR)))
+    (is (= 2 (precedencia 'AND)))
+    (is (= 4 (precedencia '<)))
+    (is (= 4 (precedencia '>)))
+    (is (= 4 (precedencia '=)))
+    (is (= 4 (precedencia '<=)))
+    (is (= 4 (precedencia '>=)))
+    (is (= 4 (precedencia '<>)))
+    (is (= 5 (precedencia '+)))
+    (is (= 5 (precedencia '-)))
+    (is (= 6 (precedencia '*)))
+    (is (= 6 (precedencia '/)))
+    (is (= 7 (precedencia '-u)))
+    (is (= 8 (precedencia 'MID$)))
+    (is (= 8 (precedencia 'MID3$)))
+  )
+)
+
+(deftest eliminar-cero-decimal-test
+  (testing "Test funcion eliminar cero decimal"
+    (is (= 1 (eliminar-cero-decimal 1)))
+    (is (= 1 (eliminar-cero-decimal 1.0)))
+    (is (= 1 (eliminar-cero-decimal 1.00)))
+    (is (= 'A (eliminar-cero-decimal 'A)))
+    (is (= 1.1 (eliminar-cero-decimal 1.1)))
+    (is (= 1.1 (eliminar-cero-decimal 1.10)))
+    (is (= 1.05 (eliminar-cero-decimal 1.05)))
+    (is (= 1.05 (eliminar-cero-decimal 1.050)))
+  )
+)
+
+(deftest eliminar-cero-entero-test
+  (testing "Test funcion eliminar cero entero"
+    (is (= nil (eliminar-cero-entero nil)))
+    (is (= "A" (eliminar-cero-entero 'A)))
+    (is (= " 0" (eliminar-cero-entero 0)))
+    (is (= " 1.5" (eliminar-cero-entero 1.5)))
+    (is (= " 1" (eliminar-cero-entero 1)))
+    (is (= "-1" (eliminar-cero-entero -1)))
+    (is (= "-1.5" (eliminar-cero-entero -1.5)))
+    (is (= " .5" (eliminar-cero-entero 0.5)))
+    (is (= " .5" (eliminar-cero-entero 000.5)))
+    (is (= "-.5" (eliminar-cero-entero -0.5)))
+    (is (= "-.5" (eliminar-cero-entero -0000.5)))
+  )
+)
+
+(deftest cargar-linea-test
+  (testing "Test funcion cargar linea"
+    (is (= ['((10 (PRINT X))) [:ejecucion-inmediata 0] [] [] [] 0 {}] (cargar-linea '(10 (PRINT X)) [() [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+    (is (= ['((10 (PRINT X)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}] (cargar-linea '(20 (X = 100)) ['((10 (PRINT X))) [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+    (is (= ['((5 (X = 100)) (10 (PRINT X))) [:ejecucion-inmediata 0] [] [] [] 0 {}] (cargar-linea '(5 (X = 100)) ['((10 (PRINT X))) [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+    (is (= ['((10 (PRINT X)) (15 (X = X + 1)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}] (cargar-linea '(15 (X = X + 1)) ['((10 (PRINT X)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+    (is (= ['((10 (PRINT X)) (15 (X = X - 1)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}] (cargar-linea '(15 (X = X - 1)) ['((10 (PRINT X)) (15 (X = X + 1)) (20 (X = 100))) [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+  )
+)
+
+(deftest dar-error-test
+  (testing "Test funcion dar error"
+    (is (= nil (dar-error "?ERROR DISK FULL" [:ejecucion-inmediata 4])))
+    (is (= nil (dar-error 16 [:ejecucion-inmediata 4])))
+    (is (= nil (dar-error 16 [100 3])))
+    (is (= nil (dar-error "?ERROR DISK FULL" [100 3])))
+  )
+)
+
+(deftest buscar-lineas-restantes-test
+  (testing "Test funcion buscar lineas restantes"
+    (is (= nil (buscar-lineas-restantes [() [:ejecucion-inmediata 0] [] [] [] 0 {}])))
+    (is (= nil (buscar-lineas-restantes ['((PRINT X) (PRINT Y)) [:ejecucion-inmediata 2] [] [] [] 0 {}])))
+    (is (= (list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [10 2] [] [] [] 0 {}])))
+    (is (= (list '(10 (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [10 1] [] [] [] 0 {}])))
+    (is (= (list '(10) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [10 0] [] [] [] 0 {}])))
+    (is (= (list '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [15 1] [] [] [] 0 {}])))
+    (is (= (list '(15) (list 20 (list 'NEXT 'I (symbol ",") 'J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [15 0] [] [] [] 0 {}])))
+    (is (= '((20 (NEXT I) (NEXT J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 3] [] [] [] 0 {}])))
+    (is (= '((20 (NEXT I) (NEXT J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 2] [] [] [] 0 {}])))
+    (is (= '((20 (NEXT J))) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 1] [] [] [] 0 {}])))
+    (is (= '((20)) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 0] [] [] [] 0 {}])))
+    (is (= '((20)) (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 -1] [] [] [] 0 {}])))
+    (is (= nil (buscar-lineas-restantes [(list '(10 (PRINT X) (PRINT Y)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [25 0] [] [] [] 0 {}])))
+  )
+)
+
+(deftest continuar-linea-test
+  (testing "Test funcion buscar lineas restantes"
+    (is (= [nil [(list '(10 (PRINT X)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 3] [] [] [] 0 {}]] (continuar-linea [(list '(10 (PRINT X)) '(15 (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 3] [] [] [] 0 {}])))
+    (is (= [:omitir-restante [(list '(10 (PRINT X)) '(15 (GOSUB 100) (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [15 1] [] [] [] 0 {}]] (continuar-linea [(list '(10 (PRINT X)) '(15 (GOSUB 100) (X = X + 1)) (list 20 (list 'NEXT 'I (symbol ",") 'J))) [20 3] [[15 2]] [] [] 0 {}])))
+  )
+)
+
+(deftest extraer-data-test
+  (testing "Test funcion extraer data"
+    (is (= '() (extraer-data '(()))))
+    (is (= '("HOLA" "MUNDO" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'MUNDO (symbol ",") 10 (symbol ",") 20))))))
+    (is (= '("HOLA" "MUNDO" 10.5 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'MUNDO (symbol ",") 10.5 (symbol ",") 20))))))
+    (is (= '("HOLA" "CHAU" "MUNDO" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA) (DATA CHAU)) (list 100 (list 'DATA 'MUNDO (symbol ",") 10 (symbol ",") 20))))))
+    (is (= '("HOLA" "MUNDO 10" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'MUNDO 10(symbol ",") 10 (symbol ",") 20))))))
+    (is (= '("HOLA" "HOLA 2 MUNDO" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'HOLA 2 'MUNDO (symbol ",") 10 (symbol ",") 20))))))
+  )
+)
