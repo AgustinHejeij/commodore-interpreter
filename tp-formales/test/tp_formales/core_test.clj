@@ -44,7 +44,7 @@
     (is (= false (variable-float? 'XY$)))
     (is (= false (variable-float? 'X1.0$)))
     (is (= false (variable-float? 'XLET)))
-    (is (= false (variable-float? (symbol "1X"))))
+    (is (= false (variable-float? "1X")))
   )
 )
 
@@ -223,6 +223,7 @@
     (is (= 7 (precedencia '-u)))
     (is (= 8 (precedencia 'MID$)))
     (is (= 8 (precedencia 'MID3$)))
+    (is (= 8 (precedencia 'LEN)))
   )
 )
 
@@ -307,5 +308,33 @@
     (is (= '("HOLA" "CHAU" "MUNDO" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA) (DATA CHAU)) (list 100 (list 'DATA 'MUNDO (symbol ",") 10 (symbol ",") 20))))))
     (is (= '("HOLA" "MUNDO 10" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'MUNDO 10(symbol ",") 10 (symbol ",") 20))))))
     (is (= '("HOLA" "HOLA 2 MUNDO" 10 20) (extraer-data (list '(10 (PRINT X) (REM ESTE NO) (DATA 30)) '(20 (DATA HOLA)) (list 100 (list 'DATA 'HOLA 2 'MUNDO (symbol ",") 10 (symbol ",") 20))))))
+  )
+)
+
+(deftest preprocesar-expresion-test
+  (testing "Test funcion preprocesar expresion"
+    (is (= '("HOLA" + " MUNDO" + "") (preprocesar-expresion '(X$ + " MUNDO" + Z$) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))
+    (is (= '(5 + 0 / 2 * 0) (preprocesar-expresion '(X + . / Y% * Z) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X 5 Y% 2}])))
+    (is (= '(0 + 0 / 2 * 0) (preprocesar-expresion '(X + . / Y% * Z) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{Y% 2}])))
+    (is (= (list 'MID$ (symbol "(") "HOLA" (symbol ",") 1 (symbol ")")) (preprocesar-expresion (list 'MID$ (symbol "(") 'X$ (symbol ",") 1 (symbol ")")) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))
+  )
+)
+
+(deftest desambiguar-test
+  (testing "Test funcion desambiguar"
+    (is (= (list '-u 2 '* (symbol "(") '-u 3 '+ 5 '- (symbol "(") 2 '/ 7 (symbol ")") (symbol ")")) (desambiguar (list '- 2 '* (symbol "(") '- 3 '+ 5 '- (symbol "(") '+ 2 '/ 7 (symbol ")") (symbol ")")))))
+    (is (= (list 'MID$ (symbol "(") 1 (symbol ",") 2 (symbol ")")) (desambiguar (list 'MID$ (symbol "(") 1 (symbol ",") 2 (symbol ")")))))
+    (is (= (list 'MID3$ (symbol "(") 1 (symbol ",") 2 (symbol ",") 3 (symbol ")")) (desambiguar (list 'MID$ (symbol "(") 1 (symbol ",") 2 (symbol ",") 3 (symbol ")")))))
+    (is (= (list 'MID3$ (symbol "(") 1 (symbol ",") '-u 2 '+ 'K (symbol ",") 3 (symbol ")")) (desambiguar (list 'MID$ (symbol "(") 1 (symbol ",") '- 2 '+ 'K (symbol ",") 3 (symbol ")")))))
+  )
+)
+
+(deftest ejecutar-asignacion-test
+  (testing "Test funcion ejecutar asignacion"
+    (is (= '[((10 (PRINT X))) [10 1] [] [] [] 0 {X 5}] (ejecutar-asignacion '(X = 5) ['((10 (PRINT X))) [10 1] [] [] [] 0 {}])))
+    (is (= '[((10 (PRINT X))) [10 1] [] [] [] 0 {X 5}] (ejecutar-asignacion '(X = 5) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X 2}])))
+    (is (= '[((10 (PRINT X))) [10 1] [] [] [] 0 {X 3}] (ejecutar-asignacion '(X = X + 1) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X 2}])))
+    (is (= '[((10 (PRINT X))) [10 1] [] [] [] 0 {X$ "HOLA MUNDO"}] (ejecutar-asignacion '(X$ = X$ + " MUNDO") ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))
+    (is (= '[((10 (PRINT X))) [10 1] [] [] [] 0 {X$ "HOLA" L 4}] (ejecutar-asignacion (list 'L '= 'LEN (symbol "(") 'X$ (symbol ")")) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))
   )
 )

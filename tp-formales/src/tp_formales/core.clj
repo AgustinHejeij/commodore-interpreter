@@ -11,3 +11,11 @@
   [& args]
 
   (main/driver-loop))
+
+; A COMPLETAR
+; READ, DATA?, RESTORE, CLEAR, LET, LIST, NEW, END, 
+; ATN, INT, SIN, EXP, LOG, ASC, *, >, <, >=, <=, <>, OR
+
+; desambiguar-mid desambiguar-mas-menos calcular-expresion
+
+; INPUT
