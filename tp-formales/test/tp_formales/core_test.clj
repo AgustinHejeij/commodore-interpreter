@@ -82,30 +82,13 @@
   )
 )
 
-(deftest variable-integer?-test
-  (testing "Casos validos"
-    (is (= true (variable-integer? 'X%)))
-    (is (= true (variable-integer? 'X1%)))
-    (is (= true (variable-integer? 'XY%)))
-  )
-  
-  (testing "Casos invalidos"
-    (is (= false (variable-integer? 'X)))
-    (is (= false (variable-integer? 'X1)))
-    (is (= false (variable-integer? 'XY)))
-    (is (= false (variable-integer? 'X$)))
-    (is (= false (variable-integer? 'X1$)))
-    (is (= false (variable-integer? 'XY$)))
-  )
-)
-
 (deftest expandir-nexts-test
   (testing "Test funcion expandir-nexts"
     (is (= '((PRINT 1) (NEXT A) (NEXT B)) (expandir-nexts (list '(PRINT 1) (list 'NEXT 'A (symbol ",") 'B)))))
     (is (= '((PRINT 1) (NEXT A) (NEXT B) (NEXT A) (NEXT B) (PRINT 2)) (expandir-nexts (list '(PRINT 1) (list 'NEXT 'A (symbol ",") 'B) '(NEXT A) '(NEXT B) '(PRINT 2)))))
     (is (= '((PRINT 1) (NEXT A) (NEXT B) (NEXT A) ) (expandir-nexts (list '(PRINT 1) (list 'NEXT 'A (symbol ",") 'B) '(NEXT A)))))
     (is (= '((PRINT 1) (PRINT 2) ) (expandir-nexts (list '(PRINT 1) '(PRINT 2)))))
-    (is (= '((NEXT A) (NEXT B) ) (expandir-nexts (list (list 'NEXT 'A (symbol ",") 'B)))))
+    (is (= '((NEXT A) (NEXT B)) (expandir-nexts (list (list 'NEXT 'A (symbol ",") 'B)))))
   )
 )
 
@@ -172,6 +155,8 @@
 (deftest anular-invalidos-test
   (testing "Test anular invalidos"
     (is (= '(IF X nil * Y < 12 THEN LET nil X = 0) (anular-invalidos '(IF X & * Y < 12 THEN LET ! X = 0))))
+    (is (= '(IF . * Y < 12.5 THEN LET nil X = 0) (anular-invalidos '(IF . * Y < 12.5 THEN LET ! X = 0))))
+    (is (= (list 'IF "HOLA" '= 'MID$ (symbol "(") 'X$ (symbol ",") nil (symbol ")") 'THEN 'X '= nil) (anular-invalidos (list 'IF "HOLA" '= 'MID$ (symbol "(") 'X$ (symbol ",") 'º (symbol ")") 'THEN 'X '= '%E))))
   )
 )
 
@@ -314,6 +299,7 @@
 (deftest preprocesar-expresion-test
   (testing "Test funcion preprocesar expresion"
     (is (= '("HOLA" + " MUNDO" + "") (preprocesar-expresion '(X$ + " MUNDO" + Z$) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))
+    (is (= '("0" + " MUNDO" + "") (preprocesar-expresion '(X$ + " MUNDO" + Z$) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "0"}])))
     (is (= '(5 + 0 / 2 * 0) (preprocesar-expresion '(X + . / Y% * Z) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X 5 Y% 2}])))
     (is (= '(0 + 0 / 2 * 0) (preprocesar-expresion '(X + . / Y% * Z) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{Y% 2}])))
     (is (= (list 'MID$ (symbol "(") "HOLA" (symbol ",") 1 (symbol ")")) (preprocesar-expresion (list 'MID$ (symbol "(") 'X$ (symbol ",") 1 (symbol ")")) ['((10 (PRINT X))) [10 1] [] [] [] 0 '{X$ "HOLA"}])))

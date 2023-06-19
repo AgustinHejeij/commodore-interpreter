@@ -39,9 +39,9 @@
 (declare buscar-lineas-restantes)         ; IMPLEMENTAR (DONE)
 (declare continuar-linea)                 ; IMPLEMENTAR (DONE)
 (declare extraer-data)                    ; IMPLEMENTAR (DONE)
-(declare ejecutar-asignacion)             ; IMPLEMENTAR
+(declare ejecutar-asignacion)             ; IMPLEMENTAR (DONE)
 (declare preprocesar-expresion)           ; IMPLEMENTAR (DONE)
-(declare desambiguar)                     ; IMPLEMENTAR
+(declare desambiguar)                     ; IMPLEMENTAR (DONE)
 (declare precedencia)                     ; IMPLEMENTAR (DONE)
 (declare aridad)                          ; IMPLEMENTAR (DONE)
 (declare eliminar-cero-decimal)           ; IMPLEMENTAR (DONE)
@@ -515,7 +515,7 @@
 ; actualizado
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn evaluar [sentencia amb]
-  (if (do (prn sentencia) (or (contains? (set sentencia) nil) (and (palabra-reservada? (first sentencia)) (= (second sentencia) '=))))
+  (if (or (contains? (set sentencia) nil) (and (palabra-reservada? (first sentencia)) (= (second sentencia) '=)))
       (do (dar-error 16 (amb 1)) [nil amb])  ; Syntax error  
       (case (first sentencia)
         PRINT (let [args (next sentencia), resu (imprimir args amb)]
@@ -563,8 +563,8 @@
                     (recur sentencia-de-if amb)))
         INPUT (leer-con-enter (next sentencia) amb)
         ON (let [separados (split-with #(not (contains? #{"GOTO" "GOSUB"} (str %))) (next sentencia)),
-                 indice-de-on (do (prn "indice on" (calcular-expresion (first separados) amb)) (calcular-expresion (first separados) amb)),
-                 sentencia-de-on (do (prn "sentencia de on" (first (second separados))) (first (second separados))),
+                 indice-de-on (calcular-expresion (first separados) amb),
+                 sentencia-de-on (first (second separados)),
                  destino-de-on (seleccionar-destino-de-on (next (second separados)) indice-de-on amb)]
                 (cond
                   (nil? destino-de-on) [nil amb]
@@ -591,6 +591,14 @@
         NEXT (if (<= (count (next sentencia)) 1)
                  (retornar-al-for amb (fnext sentencia))
                   (do (dar-error 16 (amb 1)) [nil amb]))  ; Syntax error
+        LET (let [resu (ejecutar-asignacion (rest sentencia) amb)]
+                 (if (nil? resu)
+                     [nil amb]
+                     [:sin-errores resu]))
+        END [:omitir-restante [(first amb) [:ejecucion-inmediata 0] [] [] [] 0 (last amb)]] ;[() [:ejecucion-inmediata 0] [] [] [] 0 {}]
+        READ (leer-data (next sentencia) amb)
+        RESTORE [:sin-errores [(nth amb 0) (nth amb 1) (nth amb 2) (nth amb 3) (nth amb 4) 0 (nth amb 6)]]
+        LIST (do (mostrar-listado (first amb)) [:sin-errores amb])
         (if (= (second sentencia) '=)
             (let [resu (ejecutar-asignacion sentencia amb)]
                  (if (nil? resu)
@@ -610,7 +618,11 @@
         (dar-error 16 nro-linea)  ; Syntax error
         (case operador
           INT (int operando)
-          
+          LOG (Math/log operando)
+          EXP (Math/exp operando)
+          SIN (Math/sin operando)
+          ASC (int (first operando))
+          ATN (Math/atan operando)
           -u (- operando)
           LEN (count operando)
           STR$ (if (not (number? operando)) (dar-error 163 nro-linea) (eliminar-cero-entero operando)) ; Type mismatch error
@@ -627,6 +639,7 @@
           = (if (and (string? operando1) (string? operando2))
                 (if (= operando1 operando2) -1 0)
                 (if (= (+ 0 operando1) (+ 0 operando2)) -1 0))
+          * (* operando1 operando2)
           + (if (and (string? operando1) (string? operando2))
                 (str operando1 operando2)
                 (+ operando1 operando2))
@@ -644,7 +657,7 @@
                      (cond
                        (or (< operando2 1) (< operando3 0)) (dar-error 53 nro-linea)  ; Illegal quantity error
                        (>= ini tam) ""
-                       (>= fin tam) (subs operando1 ini tam)
+                       (>= fin tam) (do (subs operando1 ini tam) (subs operando1 ini tam))
                        :else (subs operando1 ini fin))))))
 )
 
@@ -661,7 +674,7 @@
 ; false
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn palabra-reservada? [x]
-  (.contains '(ENV LOAD SAVE RUN EXIT INPUT PRINT ? DATA READ REM RESTORE CLEAR LET LIST NEW END FOR TO NEXT STEP GOSUB RETURN GOTO IF THEN ON ATN INT SIN EXP LOG LEN MID$ ASC CHR$ STR$) x)
+  (.contains '(ENV LOAD SAVE RUN EXIT INPUT PRINT ? DATA READ REM RESTORE CLEAR LET LIST NEW END FOR TO NEXT STEP GOSUB RETURN GOTO IF THEN ON ATN INT SIN EXP LOG LEN MID$ ASC CHR$ STR$ AND OR) x)
 )
 
 ;END LOAD SAVE RUN EXIT INPUT PRINT ? DATA READ REM RESTORE CLEAR LET LIST NEW END FOR TO NEXT STEP GOSUB RETURN GOTO IF THEN ON ATN INT SIN EXP LOG LEN MID$ASC CHR$ STR$
@@ -687,7 +700,12 @@
 ; (IF X nil * Y < 12 THEN LET nil X = 0)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn anular-invalidos [sentencia]
-  (map #(if (or (palabra-reservada? %) (operador? %) (variable-float? %) (variable-string? %) (variable-integer? %) (number? %) (string? %) (.contains (list (symbol ".") (symbol ";") (symbol ":") (symbol "(") (symbol ")") (symbol ",")) %)) % nil) sentencia)
+  (
+    cond
+    (nil? sentencia) '()
+    (or (= (first sentencia) 'LOAD) (= (first sentencia) 'REM)) sentencia
+    :else (map #(if (or (palabra-reservada? %) (operador? %) (variable-float? %) (variable-string? %) (variable-integer? %) (number? %) (string? %) (.contains (list (symbol ".") (symbol ";") (symbol ":") (symbol "(") (symbol ")") (symbol ",")) %)) % nil) sentencia)
+  )
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1024,6 +1042,7 @@
 (defn precedencia [token]
   (
     cond
+    (= (symbol ",") token) 0
     (= 'OR token) 1
     (= 'AND token) 2
     (.contains '(< > = <= >= <>) token) 4
@@ -1105,14 +1124,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn eliminar-cero-entero [n]
     (
-        cond
-        (nil? n) nil
-        (not (number? n)) (str n)
-        (>= n 1) (str " " n)
-        (<= n -1) (str n)
-        (= n 0) (str " " n)
-        (>= n 0) (str " " (subs (str n) 1))
-        :else (str "-" (subs (str n) 2))
+      cond
+      (nil? n) nil
+      (not (number? n)) (str n)
+      (>= n 1) (if (int? n) (str " "  n) (str " " (float n)))
+      (<= n -1) (if (int? n) (str n) (str (float n)))
+      (= n 0) (str " " n)
+      (>= n 0) (str " " (subs (str (float n)) 1))
+      :else (str "-" (subs (str (float n)) 2))
     )
 )
 
